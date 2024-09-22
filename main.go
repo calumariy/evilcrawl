@@ -11,8 +11,13 @@ func main() {
 	flag.Parse()
 	domain := *domainPtr
 	if domain == "" {
-		fmt.Println("error: please enter a domain with -d")
+		fmt.Fprintln(os.Stderr, "error: please specify a domain with -d")
 		os.Exit(1)
 	}
-	fmt.Println("domain:", domain)
+	subdomains, err := compileSubdomains(domain)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println(subdomains)
 }
