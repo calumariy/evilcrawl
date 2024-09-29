@@ -37,23 +37,30 @@ func activeDNSRecon(mainDomain string, wordlistPath string) ([]string, error) {
 	handleErr(err)
 	wordlistScanner := bufio.NewScanner(wordlist)
 	wordlistScanner.Split(bufio.ScanLines)
-	isHttp := false
-	isHttps := false
 	domain := mainDomain
+	proto := ""
 
 	// Remove protocol prefix
 	if strings.HasPrefix(mainDomain, "http://") {
-		isHttp = true
 		domain = strings.TrimPrefix(domain, "http://")
+		proto = "http://"
 	} else if strings.HasPrefix(mainDomain, "https://") {
-		isHttps = true
 		domain = strings.TrimPrefix(domain, "https://")
+		proto = "https://"
 	}
 
+	// List of subdomains that give a response
+	subdomains := []string{}
 	for wordlistScanner.Scan() {
 		subdomainWord := wordlistScanner.Text()
-
+		subdomain := proto + subdomainWord + "." + domain
+		_, err := http.Get(subdomain)
+		if err != nil {
+			continue
+		}
+		subdomains = append(subdomains, subdomain)
 	}
+
 	return []string{mainDomain}, nil
 }
 
