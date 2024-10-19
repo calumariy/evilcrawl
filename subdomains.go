@@ -8,32 +8,24 @@ import (
 	"strings"
 )
 
-func compileSubdomains(mainDomain string, wordlist string, customSubdomainsFile string) ([]string, error) {
+func compileSubdomains(mainDomain string, wordlist string, customSubdomainsFile string) {
 	// Check that domain exists
 	_, err := http.Get(mainDomain)
 	handleErr(err)
-	passiveSubdomains, err := passiveDNSRecon(mainDomain)
+	passiveDNSRecon(mainDomain)
 
-	var activeSubdomains []string
 	if wordlist == "" {
 		fmt.Fprintln(os.Stderr, "[!] no wordlist detected, skipping brute force")
 	} else {
-		activeSubdomains, err = activeDNSRecon(mainDomain, wordlist)
-		handleErr(err)
+		activeDNSRecon(mainDomain, wordlist)
 	}
 
-	passiveAndActiveDomains, err := joinSubdomains(passiveSubdomains, activeSubdomains)
-	handleErr(err)
-
-	customSubdomains := []string{}
-	customSubdomainList, err := os.Open(customSubdomainsFile)
-	handleErr(err)
-
-	subdomains := []string{}
-
 	if customSubdomainsFile != "" {
+		customSubdomainList, err := os.Open(customSubdomainsFile)
+		handleErr(err)
 		customSubdomainScanner := bufio.NewScanner(customSubdomainList)
 		customSubdomainScanner.Split(bufio.ScanLines)
+
 		for customSubdomainScanner.Scan() {
 			customSubdomain := customSubdomainScanner.Text()
 			if !strings.Contains(customSubdomain, "http://") {
@@ -43,35 +35,24 @@ func compileSubdomains(mainDomain string, wordlist string, customSubdomainsFile 
 			if err != nil {
 				continue
 			}
-			customSubdomains = append(customSubdomains, customSubdomain)
+
+			newSubdomain(customSubdomain)
 		}
-		subdomains, err = joinSubdomains(passiveAndActiveDomains, customSubdomains)
 		handleErr(err)
 	} else {
 		fmt.Fprintln(os.Stderr, "[!] no custom subdomains supplied")
 	}
 
-	foundDomain := false
-	for _, domainName := range subdomains {
-		if domainName == mainDomain {
-			foundDomain = true
-			break
-		}
-	}
-
-	if !foundDomain {
-		subdomains = append(subdomains, mainDomain)
-	}
-
-	return subdomains, nil
+	newSubdomain(mainDomain)
+	return
 }
 
-func passiveDNSRecon(mainDomain string) ([]string, error) {
+func passiveDNSRecon(mainDomain string) {
 	fmt.Fprintln(os.Stderr, "[!] Passive dns recon not supported yet")
-	return []string{mainDomain}, nil
+	return
 }
 
-func activeDNSRecon(mainDomain string, wordlistPath string) ([]string, error) {
+func activeDNSRecon(mainDomain string, wordlistPath string) {
 	wordlist, err := os.Open(wordlistPath)
 	handleErr(err)
 	wordlistScanner := bufio.NewScanner(wordlist)
@@ -89,7 +70,6 @@ func activeDNSRecon(mainDomain string, wordlistPath string) ([]string, error) {
 	}
 
 	// List of subdomains that give a response
-	subdomains := []string{}
 	for wordlistScanner.Scan() {
 		subdomainWord := wordlistScanner.Text()
 		subdomain := proto + subdomainWord + "." + domain
@@ -97,28 +77,8 @@ func activeDNSRecon(mainDomain string, wordlistPath string) ([]string, error) {
 		if err != nil {
 			continue
 		}
-		subdomains = append(subdomains, subdomain)
+		newSubdomain(subdomain)
 	}
 
-	return subdomains, nil
-}
-
-func joinSubdomains(subdomains1 []string, subdomains2 []string) ([]string, error) {
-	m := make(map[string]bool)
-	compiledSubdomains := []string{}
-
-	for _, domain1 := range subdomains1 {
-		m[domain1] = true
-		compiledSubdomains = append(compiledSubdomains, domain1)
-	}
-
-	for _, domain2 := range subdomains2 {
-		_, hasDomain := m[domain2]
-		if !hasDomain {
-			compiledSubdomains = append(compiledSubdomains, domain2)
-			m[domain2] = true
-		}
-	}
-
-	return compiledSubdomains, nil
+	return
 }

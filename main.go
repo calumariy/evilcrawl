@@ -5,7 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 )
+
+var subdomains = make(map[string]struct{})
+var mu sync.Mutex
+var outFile *os.File
 
 func main() {
 	domainPtr := flag.String("d", "", "the ip of target")
@@ -24,7 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	outFile := os.Stdout
+	outFile = os.Stdout
 	if outFileName == "" {
 		fmt.Fprintln(os.Stderr, "[!] No out file specified - output will be set to stdout")
 	} else {
@@ -33,11 +38,10 @@ func main() {
 		handleErr(err)
 	}
 
-	subdomains, err := compileSubdomains(domain, wordlist, customSubdomains)
-	handleErr(err)
-	amntSubdomains := len(subdomains)
-	for _, subdomain := range subdomains {
-		fmt.Fprintln(outFile, subdomain)
+	compileSubdomains(domain, wordlist, customSubdomains)
+	fmt.Fprintln(os.Stderr, "[.] found "+strconv.Itoa(len(subdomains))+" subdomains! Launching workers...")
+
+	for subdomain := range subdomains {
+		recursivelyAttackDirectory(domain, subdomain)
 	}
-	fmt.Fprintln(os.Stderr, "[.] found "+strconv.Itoa(amntSubdomains)+" subdomains! Launching workers...")
 }
