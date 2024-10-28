@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-func recursivelyAttackDirectory(baseDomain string, domain string) {
-	resp, err := http.Get(domain)
+func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string, client *http.Client) {
+	resp, err := client.Get(domain)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -25,26 +25,48 @@ func recursivelyAttackDirectory(baseDomain string, domain string) {
 	page, err := html.Parse(resp.Body)
 	handleErr(err)
 
-	findNewInfo(removeProtocol(baseDomain), page)
+	findNewInfo(baseSub, domain, page, client)
 }
 
-func findNewInfo(baseDomain string, n *html.Node) {
+func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.Client) {
+	if n.Type == html.ElementNode && n.Data == "input" {
+		attackInput(baseSub, baseDomain, n)
+	}
+
 	if n.Type == html.ElementNode && n.Data == "a" {
 		for _, attr := range n.Attr {
-			if attr.Key == "href" && strings.Contains(attr.Val, baseDomain) {
+
+			if attr.Key == "href" && strings.Contains(attr.Val, baseSub) {
 				newDomain := attr.Val
 				newDomainArr := strings.Split(newDomain, "/")
 				newSub := newDomainArr[0] + "//" + newDomainArr[2]
+
 				if _, exists := subdomains[newSub]; !exists {
 					newSubdomain(newSub)
-					recursivelyAttackDirectory(baseDomain, newSub)
+					newDirectory(newSub)
+					recursivelyAttackDirectory(baseSub, baseDomain, newSub, client)
+				} else if _, exists := directories[newDomain]; !exists {
+					newDirectory(newDomain)
+					recursivelyAttackDirectory(baseSub, baseDomain, newDomain, client)
+				}
+			} else if attr.Key == "href" && strings.HasPrefix(attr.Val, "/") && !strings.HasSuffix(baseDomain, attr.Val) {
+
+				newDomain := attr.Val
+				newSubArr := strings.Split(baseSub, "/")
+
+				domain := newSubArr[0] + "//" + newSubArr[2] + newDomain
+
+				if _, exists := directories[domain]; !exists {
+					newDirectory(domain)
+					recursivelyAttackDirectory(baseSub, baseDomain, domain, client)
 				}
 			}
+
 		}
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		findNewInfo(baseDomain, c)
+		findNewInfo(baseSub, baseDomain, c, client)
 	}
 
 	return

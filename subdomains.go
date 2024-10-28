@@ -11,6 +11,7 @@ import (
 func compileSubdomains(mainDomain string, wordlist string, customSubdomainsFile string) {
 	// Check that domain exists
 	_, err := http.Get(mainDomain)
+
 	handleErr(err)
 	passiveDNSRecon(mainDomain)
 

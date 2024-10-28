@@ -26,11 +26,22 @@ func removeProtocol(domain string) string {
 }
 
 func newSubdomain(domain string) {
-	mu.Lock()
-	defer mu.Unlock()
+	subMu.Lock()
+	defer subMu.Unlock()
 
 	if _, exists := subdomains[domain]; !exists {
 		subdomains[domain] = struct{}{}
+
+		fmt.Fprintln(outFile, domain)
+	}
+}
+
+func newDirectory(domain string) {
+	dirMu.Lock()
+	defer dirMu.Unlock()
+
+	if _, exists := directories[domain]; !exists {
+		directories[domain] = struct{}{}
 
 		fmt.Fprintln(outFile, domain)
 	}
