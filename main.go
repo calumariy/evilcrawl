@@ -21,6 +21,7 @@ var dirMu sync.Mutex
 var outFile *os.File
 
 var isAuthorised bool
+var auth string
 
 func main() {
 
@@ -46,6 +47,7 @@ func main() {
 	handleErr(err)
 
 	var cookies []*http.Cookie
+	auth = authStr
 	if authStr != "" {
 		isAuthorised = true
 		domainPath := strings.Split(domain, "/")
