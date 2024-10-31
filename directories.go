@@ -15,6 +15,9 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
+	// Try LFI
+
+	attemptLFI(domain, client)
 
 	// Dont continue if cant access page
 	if resp.StatusCode >= 400 {
