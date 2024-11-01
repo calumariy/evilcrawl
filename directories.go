@@ -17,6 +17,7 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 	}
 	// Try LFI
 
+	go attemptURLXSS(domain, client)
 	go attemptLFI(domain, client)
 
 	// Dont continue if cant access page

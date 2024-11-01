@@ -95,6 +95,22 @@ func attemptLFI(domain string, client *http.Client) {
 	}
 }
 
+func attemptURLXSS(domain string, client *http.Client) {
+	wg.Add(1)
+	defer wg.Done()
+	index := strings.Index(domain, "=")
+	if index != -1 {
+		domain = domain[:index] + "="
+	}
+
+	payloads := []string{"<script>alert(1)</script>"}
+	for _, payload := range payloads {
+		if doURLXSS(domain, client, payload) {
+			return
+		}
+	}
+}
+
 func doLFI(domain string, client *http.Client, payload string) bool {
 	resp, err := client.Get(domain + "/" + payload)
 	if err != nil {
@@ -132,4 +148,46 @@ func checkLFISuccess(resp *http.Response) bool {
 		}
 	}
 	return false
+}
+
+func doURLXSS(domain string, client *http.Client, payload string) bool {
+	ctx, cancel := chromedp.NewContext(context.Background())
+	defer cancel()
+
+	ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	// Variable to hold the alert text
+	var alertText string
+
+	// Run chromedp tasks
+	err := chromedp.Run(ctx,
+		chromedp.Navigate(domain+payload), // Replace with your URL
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			// Enable JS dialog events to capture alerts
+			return chromedp.Evaluate(`window.alert = function(msg) { window.alertMsg = msg; }`, nil).Do(ctx)
+		}),
+		chromedp.Click(`#triggerAlert`, chromedp.ByID), // Replace with the selector to trigger the alert
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			// Wait for the alert to be triggered
+			return chromedp.WaitReady("body", chromedp.ByQuery).Do(ctx)
+		}),
+		chromedp.Evaluate(`window.alertMsg`, &alertText), // Get the alert message
+	)
+	if err != nil {
+		if err != context.DeadlineExceeded {
+			handleErr(err)
+		}
+		return false
+	}
+
+	// Print the alert message
+	if alertText == "1" {
+		fmt.Println("[!!!] POTENTIAL LFI FOUND! " + domain + payload)
+		return true
+	} else {
+		fmt.Println("No alert was triggered.")
+		return false
+	}
+
 }
