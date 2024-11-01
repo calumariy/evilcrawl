@@ -22,6 +22,7 @@ var outFile *os.File
 
 var isAuthorised bool
 var auth string
+var wg sync.WaitGroup
 
 func main() {
 
@@ -92,4 +93,6 @@ func main() {
 	for subdomain := range subdomains {
 		recursivelyAttackDirectory(subdomain, domain, subdomain, client)
 	}
+
+	wg.Wait()
 }

@@ -17,7 +17,7 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 	}
 	// Try LFI
 
-	attemptLFI(domain, client)
+	go attemptLFI(domain, client)
 
 	// Dont continue if cant access page
 	if resp.StatusCode >= 400 {
@@ -33,7 +33,7 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 
 func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.Client) {
 	if n.Type == html.ElementNode && n.Data == "input" {
-		attackInput(baseSub, baseDomain, n)
+		go attackInput(baseSub, baseDomain, n)
 	}
 
 	if n.Type == html.ElementNode && n.Data == "a" {
