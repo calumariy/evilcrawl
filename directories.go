@@ -2,23 +2,33 @@ package main
 
 import (
 	"fmt"
-	"golang.org/x/net/html"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+
+	"golang.org/x/net/html"
 )
 
-func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string, client *http.Client) {
+func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string, client *http.Client, wg *sync.WaitGroup) {
 	resp, err := client.Get(domain)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 	// Try LFI
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		attemptURLXSS(domain, client)
+	}()
 
-	go attemptURLXSS(domain, client)
-	go attemptLFI(domain, client)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		attemptLFI(domain, client)
+	}()
 
 	// Dont continue if cant access page
 	if resp.StatusCode >= 400 {
@@ -29,12 +39,16 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 	page, err := html.Parse(resp.Body)
 	handleErr(err)
 
-	findNewInfo(baseSub, domain, page, client)
+	findNewInfo(baseSub, domain, page, client, wg)
 }
 
-func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.Client) {
+func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.Client, wg *sync.WaitGroup) {
 	if n.Type == html.ElementNode && n.Data == "input" {
-		go attackInput(baseSub, baseDomain, n)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			attackInput(baseSub, baseDomain, n)
+		}()
 	}
 
 	if n.Type == html.ElementNode && n.Data == "a" {
@@ -48,10 +62,10 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 				if _, exists := subdomains[newSub]; !exists {
 					newSubdomain(newSub)
 					newDirectory(newSub)
-					recursivelyAttackDirectory(baseSub, baseDomain, newSub, client)
+					recursivelyAttackDirectory(baseSub, baseDomain, newSub, client, wg)
 				} else if _, exists := directories[newDomain]; !exists {
 					newDirectory(newDomain)
-					recursivelyAttackDirectory(baseSub, baseDomain, newDomain, client)
+					recursivelyAttackDirectory(baseSub, baseDomain, newDomain, client, wg)
 				}
 			} else if attr.Key == "href" && strings.HasPrefix(attr.Val, "/") && !strings.HasSuffix(baseDomain, attr.Val) {
 
@@ -62,7 +76,7 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 
 				if _, exists := directories[domain]; !exists {
 					newDirectory(domain)
-					recursivelyAttackDirectory(baseSub, baseDomain, domain, client)
+					recursivelyAttackDirectory(baseSub, baseDomain, domain, client, wg)
 				}
 			}
 
@@ -70,7 +84,7 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		findNewInfo(baseSub, baseDomain, c, client)
+		findNewInfo(baseSub, baseDomain, c, client, wg)
 	}
 
 	return

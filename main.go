@@ -22,7 +22,6 @@ var outFile *os.File
 
 var isAuthorised bool
 var auth string
-var wg sync.WaitGroup
 
 func main() {
 
@@ -39,6 +38,7 @@ func main() {
 	outFileName := *outFilePtr
 	authStr := *authPtr
 
+	var wg sync.WaitGroup
 	if domain == "" {
 		fmt.Fprintln(os.Stderr, "[x] ERROR: please specify a domain or ip address with -d")
 		os.Exit(1)
@@ -91,7 +91,7 @@ func main() {
 	fmt.Fprintln(os.Stderr, "[.] found "+strconv.Itoa(len(subdomains))+" subdomains! Launching workers...")
 
 	for subdomain := range subdomains {
-		recursivelyAttackDirectory(subdomain, domain, subdomain, client)
+		recursivelyAttackDirectory(subdomain, domain, subdomain, client, &wg)
 	}
 
 	wg.Wait()

