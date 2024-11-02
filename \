@@ -82,12 +82,12 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 							inputName = attr.Val
 						}
 					}
-					if inputType == "text" {
-						if _, exists := directories[domain+"?"+inputName+"="]; !exists {
-							newDirectory(domain + "?" + inputName + "=")
-							recursivelyAttackDirectory(baseSub, baseDomain, domain+"?"+inputName+"=", client, wg)
-						}
+					if inputType == "text"
+					if _, exists := directories[newDomain]; !exists {
+						newDirectory(newDomain)
+						recursivelyAttackDirectory(baseSub, baseDomain, newDomain, client, wg)
 					}
+				}
 				}
 			}
 		}

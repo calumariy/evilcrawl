@@ -21,6 +21,9 @@ func attackInput(baseSub string, baseDomain string, n *html.Node) {
 		if attr.Key == "type" && attr.Val == "file" {
 			fmt.Println("[!] File upload detected - Link: " + baseDomain)
 		}
+		if attr.Key == "type" && attr.Val == "file" {
+			fmt.Println("[!] File upload detected - Link: " + baseDomain)
+		}
 	}
 
 	ctx, cancel := chromedp.NewContext(
@@ -31,6 +34,16 @@ func attackInput(baseSub string, baseDomain string, n *html.Node) {
 
 	// create a timeout
 	ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx,
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+	)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(allocCtx)
 	defer cancel()
 
 	// navigate to a page, wait for an element, click
@@ -156,6 +169,15 @@ func doURLXSS(domain string, client *http.Client, payload string) bool {
 	ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx,
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("no-sandbox", true),
+	)
+	defer cancel()
+
+	ctx, cancel = chromedp.NewContext(allocCtx)
+	defer cancel()
 	// Variable to hold the alert text
 	alertFound := true
 
