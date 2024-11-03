@@ -96,7 +96,7 @@ func main() {
 	fmt.Fprintln(os.Stderr, "[.] found "+strconv.Itoa(len(subdomains))+" subdomains! Launching workers...")
 
 	for subdomain := range subdomains {
-		recursivelyAttackDirectory(subdomain, domain, subdomain, client, &wg)
+		recursivelyAttackDirectory(subdomain, subdomain, client, &wg)
 	}
 
 	wg.Wait()

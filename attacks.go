@@ -13,13 +13,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-func attackInput(baseSub string, baseDomain string, n *html.Node) {
+func attackInput(baseDomain string, n *html.Node) {
 	for _, attr := range n.Attr {
 		if attr.Key == "type" && attr.Val == "password" && !isAuthorised {
 			fmt.Println("[!] found password field on: " + baseDomain + "\nWant to use authorisation? Use the -a flag!")
-		}
-		if attr.Key == "type" && attr.Val == "file" {
-			fmt.Println("[!] File upload detected - Link: " + baseDomain)
 		}
 		if attr.Key == "type" && attr.Val == "file" {
 			fmt.Println("[!] File upload detected - Link: " + baseDomain)
@@ -113,16 +110,15 @@ func attemptLFI(domain string, client *http.Client) {
 	return
 }
 
-func attemptURLXSS(domain string, client *http.Client) {
+func attemptURLXSS(domain string) {
 	index := strings.Index(domain, "=")
 	if index != -1 {
 		domain = domain[:index] + "="
 	}
 
-	// payloads := []string{"<script>alert(1)</script>"}
 	payloads := []string{"<script>alert(1)</script>"}
 	for _, payload := range payloads {
-		if doURLXSS(domain, client, payload) {
+		if doURLXSS(domain, payload) {
 			return
 		}
 	}
@@ -158,7 +154,8 @@ func checkLFISuccess(resp *http.Response) bool {
 			bodyBytes, err := io.ReadAll(resp.Body)
 			handleErr(err)
 			bodyString := string(bodyBytes)
-			if strings.Contains(bodyString, "root") || strings.Contains(bodyString, "localhost") {
+
+			if strings.Contains(bodyString, "root:x") || strings.Contains(bodyString, "localhost") {
 				return true
 			}
 		}
@@ -166,7 +163,7 @@ func checkLFISuccess(resp *http.Response) bool {
 	return false
 }
 
-func doURLXSS(domain string, client *http.Client, payload string) bool {
+func doURLXSS(domain string, payload string) bool {
 	ctx, cancel := chromedp.NewContext(context.Background(),
 		chromedp.WithErrorf(func(format string, args ...interface{}) {
 		}),
@@ -176,25 +173,24 @@ func doURLXSS(domain string, client *http.Client, payload string) bool {
 	ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	// Variable to hold the alert text
 	alertFound := true
 
 	// Run chromedp tasks
 	err := chromedp.Run(ctx,
 		setCookie(domain),
-		chromedp.Navigate(domain+payload), // navigate to random page
+		chromedp.Navigate(domain+payload),
+		// If page loads, no alert was immediately presented
 		chromedp.ActionFunc(func(ctx context.Context) error {
 
 			alertFound = false
 			return nil
 		}),
-
-		//chromedp.EvaluateAsDevTools(`window.alert = function (txt){return txt}`, &alertText),
 	)
 	if err != nil {
 		if err != context.DeadlineExceeded && !strings.Contains(err.Error(), "-32000") {
 			handleErr(err)
 		}
+		// Unable to find page error
 		if strings.Contains(err.Error(), "-32000") {
 			return false
 		}
