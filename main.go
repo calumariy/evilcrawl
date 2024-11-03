@@ -59,7 +59,12 @@ func main() {
 
 		mainDomain := domainPath[2]
 		mainDomainArr := strings.Split(mainDomain, ".")
-		cookieDomain := "." + mainDomainArr[len(mainDomainArr)-2] + "." + mainDomainArr[len(mainDomainArr)-1]
+		var cookieDomain string
+		if len(mainDomainArr) == 1 {
+			cookieDomain = strings.Split(removeProtocol(mainDomain), ":")[0]
+		} else {
+			cookieDomain = "." + mainDomainArr[len(mainDomainArr)-2] + "." + mainDomainArr[len(mainDomainArr)-1]
+		}
 		authCookie := &http.Cookie{
 			Name:   strings.Split(authStr, ":")[0],
 			Value:  strings.Split(authStr, ":")[1],

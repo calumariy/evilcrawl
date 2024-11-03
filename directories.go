@@ -33,7 +33,6 @@ func recursivelyAttackDirectory(baseSub string, baseDomain string, domain string
 	// Dont continue if cant access page
 	if resp.StatusCode >= 400 {
 		fmt.Fprintln(os.Stdout, "[!] Webpage "+domain+" returned a "+strconv.Itoa(resp.StatusCode))
-		return
 	}
 
 	page, err := html.Parse(resp.Body)
@@ -119,7 +118,7 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 					newDirectory(domain)
 					recursivelyAttackDirectory(baseSub, baseDomain, domain, client, wg)
 				}
-			} else if attr.Key == "href" && len(strings.Split(attr.Val, ".")) == 1 {
+			} else if attr.Key == "href" && len(strings.Split(attr.Val, ".")) == 1 && !strings.HasPrefix(attr.Val, "/") {
 
 				newDomain := attr.Val
 				newSubArr := strings.Split(baseSub, "/")
