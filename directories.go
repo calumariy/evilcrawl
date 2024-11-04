@@ -162,7 +162,7 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 
 				newDomain := attr.Val
 
-				domain := baseDomain + "/" + newDomain
+				domain := strings.TrimSuffix(baseDomain, "/") + "/" + newDomain
 
 				if _, exists := directories[domain]; !exists {
 					newDirectory(domain)
