@@ -140,7 +140,7 @@ func attemptSSTI(domain string, client *http.Client) {
 }
 
 func attemptSSTIPost(domain string, client *http.Client, name string) {
-	payloads := []string{"{{ 7*7 }}"}
+	payloads := []string{"{{ 127588 * 12 }}"}
 	for _, payload := range payloads {
 		formType := url.Values{name: {payload}}
 		if doSSTIPost(domain, client, formType) {
@@ -153,7 +153,10 @@ func attemptSSTIPost(domain string, client *http.Client, name string) {
 func doSSTI(domain string, client *http.Client, payload string) bool {
 	resp, err := client.Get(domain + payload)
 
-	handleErr(err)
+	if err != nil {
+		return false
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode <= 400 {
@@ -163,7 +166,7 @@ func doSSTI(domain string, client *http.Client, payload string) bool {
 			handleErr(err)
 			bodyString := string(bodyBytes)
 
-			if strings.Contains(bodyString, "49") {
+			if strings.Contains(bodyString, "1531056") {
 				fmt.Println("[!!!] POTENTIAL SSTI FOUND! " + domain + payload)
 				return true
 			}
@@ -185,7 +188,7 @@ func doSSTIPost(domain string, client *http.Client, payload url.Values) bool {
 			handleErr(err)
 			bodyString := string(bodyBytes)
 
-			if strings.Contains(bodyString, "49") {
+			if strings.Contains(bodyString, "1531056") {
 				return true
 			}
 		}
@@ -194,9 +197,9 @@ func doSSTIPost(domain string, client *http.Client, payload url.Values) bool {
 }
 
 func doLFI(domain string, client *http.Client, payload string) bool {
-	resp, err := client.Get(domain + "/" + payload)
+	resp, _ := client.Get(domain + "/" + payload)
 
-	if err != nil && checkLFISuccess(resp) {
+	if checkLFISuccess(resp) {
 		defer resp.Body.Close()
 		fmt.Println("[!!!] POTENTIAL LFI FOUND! " + domain + "/" + payload)
 		return true

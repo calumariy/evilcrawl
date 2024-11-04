@@ -156,6 +156,9 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 					recursivelyAttackDirectory(baseSub, domain, client, wg)
 				}
 			} else if attr.Key == "href" && len(strings.Split(attr.Val, ".")) == 1 && !strings.HasPrefix(attr.Val, "/") {
+				if strings.HasPrefix(attr.Val, "#") {
+					continue
+				}
 
 				newDomain := attr.Val
 
