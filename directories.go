@@ -30,6 +30,12 @@ func recursivelyAttackDirectory(baseSub string, domain string, client *http.Clie
 		attemptLFI(domain, client)
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		attemptSSTI(domain, client)
+	}()
+
 	// Dont continue if cant access page
 	if resp.StatusCode >= 400 {
 		fmt.Fprintln(os.Stdout, "[!] Webpage "+domain+" returned a "+strconv.Itoa(resp.StatusCode))
@@ -63,7 +69,7 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 			}
 		}
 
-		if action != "" && method == "GET" && strings.HasPrefix(action, "/") {
+		if (method == "GET" || method == "get") && strings.HasPrefix(action, "/") {
 			newDomain := action
 			newSubArr := strings.Split(baseSub, "/")
 
@@ -86,6 +92,37 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 							newDirectory(domain + "?" + inputName + "=")
 							recursivelyAttackDirectory(baseSub, domain+"?"+inputName+"=", client, wg)
 						}
+					}
+				}
+			}
+		}
+		if method == "post" || method == "POST" {
+			var newDomain string
+			newSubArr := strings.Split(baseSub, "/")
+			if action != "" {
+				if strings.HasPrefix(action, "/") {
+					newDomain = newSubArr[0] + "//" + newSubArr[2] + action
+				} else if !strings.HasPrefix(action, "http") {
+					newDomain = baseDomain + action
+				}
+			} else {
+				newDomain = baseDomain
+			}
+
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				if c.Type == html.ElementNode && c.Data == "input" {
+					inputType := "invalid"
+					inputName := "invalid"
+					for _, attr := range c.Attr {
+						if attr.Key == "type" {
+							inputType = attr.Val
+						}
+						if attr.Key == "name" {
+							inputName = attr.Val
+						}
+					}
+					if inputType == "text" {
+						attemptSSTIPost(newDomain, client, inputName)
 					}
 				}
 			}
@@ -121,9 +158,8 @@ func findNewInfo(baseSub string, baseDomain string, n *html.Node, client *http.C
 			} else if attr.Key == "href" && len(strings.Split(attr.Val, ".")) == 1 && !strings.HasPrefix(attr.Val, "/") {
 
 				newDomain := attr.Val
-				newSubArr := strings.Split(baseSub, "/")
 
-				domain := newSubArr[0] + "//" + newSubArr[2] + "/" + newDomain
+				domain := baseDomain + "/" + newDomain
 
 				if _, exists := directories[domain]; !exists {
 					newDirectory(domain)

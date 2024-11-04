@@ -20,6 +20,9 @@ var dirMu sync.Mutex
 
 var outFile *os.File
 
+var amountChromeTabs int
+var chromMu sync.Mutex
+
 var isAuthorised bool
 var auth string
 

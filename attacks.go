@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -124,6 +125,74 @@ func attemptURLXSS(domain string) {
 	}
 }
 
+func attemptSSTI(domain string, client *http.Client) {
+	index := strings.Index(domain, "=")
+	if index != -1 {
+		domain = domain[:index] + "="
+	}
+
+	payloads := []string{"{{ 7*7 }}"}
+	for _, payload := range payloads {
+		if doSSTI(domain, client, payload) {
+			return
+		}
+	}
+}
+
+func attemptSSTIPost(domain string, client *http.Client, name string) {
+	payloads := []string{"{{ 7*7 }}"}
+	for _, payload := range payloads {
+		formType := url.Values{name: {payload}}
+		if doSSTIPost(domain, client, formType) {
+			fmt.Println("[!!!] POTENTIAL SSTI FOUND! " + domain + " Posted with: " + name + "=" + payload)
+			return
+		}
+	}
+}
+
+func doSSTI(domain string, client *http.Client, payload string) bool {
+	resp, err := client.Get(domain + payload)
+
+	handleErr(err)
+	defer resp.Body.Close()
+
+	if resp.StatusCode <= 400 {
+
+		if resp.StatusCode == http.StatusOK {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			handleErr(err)
+			bodyString := string(bodyBytes)
+
+			if strings.Contains(bodyString, "49") {
+				fmt.Println("[!!!] POTENTIAL SSTI FOUND! " + domain + payload)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func doSSTIPost(domain string, client *http.Client, payload url.Values) bool {
+	resp, err := client.PostForm(domain, payload)
+
+	handleErr(err)
+	defer resp.Body.Close()
+
+	if resp.StatusCode <= 400 {
+
+		if resp.StatusCode == http.StatusOK {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			handleErr(err)
+			bodyString := string(bodyBytes)
+
+			if strings.Contains(bodyString, "49") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func doLFI(domain string, client *http.Client, payload string) bool {
 	resp, err := client.Get(domain + "/" + payload)
 
@@ -164,6 +233,23 @@ func checkLFISuccess(resp *http.Response) bool {
 }
 
 func doURLXSS(domain string, payload string) bool {
+
+	for {
+		if amountChromeTabs < 5 {
+			break
+		}
+	}
+
+	chromMu.Lock()
+	amountChromeTabs++
+	chromMu.Unlock()
+
+	defer func() {
+		chromMu.Lock()
+		amountChromeTabs--
+		chromMu.Unlock()
+	}()
+
 	ctx, cancel := chromedp.NewContext(context.Background(),
 		chromedp.WithErrorf(func(format string, args ...interface{}) {
 		}),
